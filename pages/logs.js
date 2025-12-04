@@ -1,11 +1,47 @@
 // File: pages/logs.js
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/router';
 import Head from 'next/head';
 
 export default function LogsViewer() {
+  const router = useRouter();
     const [logs, setLogs] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(true);
+        
+    // Add auth check
+    useEffect(() => {
+      const token = localStorage.getItem('admin_token');
+      if (!token) {
+          router.push('/admin-login');
+      }
+  }, [router]);
+  
+  // Add authFetch helper
+  const authFetch = async (url, options = {}) => {
+      const token = localStorage.getItem('admin_token');
+      if (!token) {
+          router.push('/admin-login');
+          throw new Error('No authentication token');
+      }
+      
+      const response = await fetch(url, {
+          ...options,
+          headers: {
+              ...options.headers,
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+          }
+      });
+
+      if (response.status === 401) {
+          localStorage.removeItem('admin_token');
+          router.push('/admin-login');
+          throw new Error('Authentication failed');
+      }
+
+      return response;
+  };
 
     const fetchLogs = async () => {
         try {

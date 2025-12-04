@@ -1,7 +1,9 @@
 // File: pages/api/admin/clear-cache.js
 import { clearAllCachedConversions, clearCachedConversionsByOffer, logConversion } from '../../../lib/database.js';
 
-export default async function handler(req, res) {
+import { requireAdmin } from '../../../lib/adminAuth.js';
+
+export default requireAdmin(async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ message: 'Method not allowed' });
   }
@@ -51,4 +53,4 @@ export default async function handler(req, res) {
       message: 'Failed to clear cache'
     });
   }
-}
+});

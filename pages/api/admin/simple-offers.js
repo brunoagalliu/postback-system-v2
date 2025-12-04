@@ -6,8 +6,9 @@ import {
   getAllSimpleOffers,
   logConversion
 } from '../../../lib/database.js';
+import { requireAdmin } from '../../../lib/adminAuth.js';
 
-export default async function handler(req, res) {
+export default requireAdmin(async function handler(req, res) {
   try {
     switch (req.method) {
       case 'GET':
@@ -144,4 +145,4 @@ export default async function handler(req, res) {
       message: 'Failed to manage offers'
     });
   }
-}
+});

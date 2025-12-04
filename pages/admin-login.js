@@ -6,11 +6,13 @@ import Head from 'next/head';
 export default function AdminLogin() {
     const [token, setToken] = useState('');
     const [error, setError] = useState('');
+    const [loading, setLoading] = useState(false);
     const router = useRouter();
 
     const handleLogin = async (e) => {
         e.preventDefault();
         setError('');
+        setLoading(true);
 
         try {
             // Test the token by making a request
@@ -26,10 +28,13 @@ export default function AdminLogin() {
                 // Redirect to admin dashboard
                 router.push('/admin');
             } else {
-                setError('Invalid admin token');
+                const data = await response.json();
+                setError(data.message || 'Invalid admin token');
             }
         } catch (err) {
             setError('Login failed: ' + err.message);
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -42,7 +47,7 @@ export default function AdminLogin() {
             background: '#f5f5f5'
         }}>
             <Head>
-                <title>Admin Login</title>
+                <title>Admin Login - Conversion Tracker</title>
             </Head>
 
             <div style={{
@@ -54,7 +59,7 @@ export default function AdminLogin() {
                 maxWidth: '90vw'
             }}>
                 <h1 style={{ marginBottom: '30px', textAlign: 'center' }}>
-                    Admin Login
+                    🔐 Admin Login
                 </h1>
 
                 {error && (
@@ -63,7 +68,8 @@ export default function AdminLogin() {
                         background: '#fff0f0',
                         color: '#d32f2f',
                         borderRadius: '4px',
-                        marginBottom: '20px'
+                        marginBottom: '20px',
+                        fontSize: '14px'
                     }}>
                         {error}
                     </div>
@@ -74,7 +80,8 @@ export default function AdminLogin() {
                         <label style={{ 
                             display: 'block', 
                             marginBottom: '8px',
-                            fontWeight: 'bold'
+                            fontWeight: 'bold',
+                            fontSize: '14px'
                         }}>
                             Admin Token:
                         </label>
@@ -84,42 +91,52 @@ export default function AdminLogin() {
                             onChange={(e) => setToken(e.target.value)}
                             placeholder="Enter your admin token"
                             required
+                            disabled={loading}
                             style={{
                                 width: '100%',
                                 padding: '12px',
                                 border: '1px solid #ccc',
                                 borderRadius: '4px',
-                                fontSize: '14px'
+                                fontSize: '14px',
+                                boxSizing: 'border-box'
                             }}
                         />
                     </div>
 
                     <button
                         type="submit"
+                        disabled={loading}
                         style={{
                             width: '100%',
                             padding: '12px',
-                            background: '#0070f3',
+                            background: loading ? '#ccc' : '#0070f3',
                             color: 'white',
                             border: 'none',
                             borderRadius: '4px',
                             fontSize: '16px',
                             fontWeight: 'bold',
-                            cursor: 'pointer'
+                            cursor: loading ? 'not-allowed' : 'pointer'
                         }}
                     >
-                        Login
+                        {loading ? 'Verifying...' : 'Login'}
                     </button>
                 </form>
 
-                <p style={{ 
+                <div style={{ 
                     marginTop: '20px', 
+                    padding: '15px',
+                    background: '#f8f9fa',
+                    borderRadius: '4px',
                     fontSize: '12px', 
-                    color: '#666',
-                    textAlign: 'center'
+                    color: '#666'
                 }}>
-                    Token is stored in your .env.local as ADMIN_SECRET_TOKEN
-                </p>
+                    <strong>💡 Where to find your token:</strong>
+                    <ol style={{ margin: '10px 0 0 0', paddingLeft: '20px' }}>
+                        <li>Check your <code>.env.local</code> file</li>
+                        <li>Look for <code>ADMIN_SECRET_TOKEN</code></li>
+                        <li>Copy the value after the <code>=</code></li>
+                    </ol>
+                </div>
             </div>
         </div>
     );

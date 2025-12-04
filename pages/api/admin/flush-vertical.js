@@ -4,8 +4,9 @@ import {
   flushVerticalCache,  // ADD THIS - import from database.js
   logConversion
 } from '../../../lib/database.js';
+import { requireAdmin } from '../../../lib/adminAuth.js';
 
-export default async function handler(req, res) {
+export default requireAdmin(async function handler(req, res) {
 if (req.method !== 'POST') {
   return res.status(405).json({ 
     success: false,
@@ -77,4 +78,4 @@ try {
     timestamp: new Date().toISOString()
   });
 }
-}
+});

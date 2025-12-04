@@ -1,7 +1,9 @@
 // File: pages/api/admin/init-offers.js
 import { initializeOffersTable } from '../../../lib/database.js';
 
-export default async function handler(req, res) {
+import { requireAdmin } from '../../../lib/adminAuth.js';
+
+export default requireAdmin(async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ 
       success: false,
@@ -25,4 +27,4 @@ export default async function handler(req, res) {
       message: 'Failed to initialize offers table'
     });
   }
-}
+});

@@ -1,7 +1,9 @@
 // File: pages/api/admin/check-database.js
 import { getPool } from '../../../lib/database.js';
 
-export default async function handler(req, res) {
+import { requireAdmin } from '../../../lib/adminAuth.js';
+
+export default requireAdmin(async function handler(req, res) {
   try {
     const pool = getPool();
     const connection = await pool.getConnection();
@@ -94,4 +96,4 @@ export default async function handler(req, res) {
       message: 'Failed to check database status'
     });
   }
-}
+});

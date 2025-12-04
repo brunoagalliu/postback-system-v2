@@ -1,8 +1,12 @@
 // File: pages/offers.js
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/router';
 import Head from 'next/head';
 
+
+
 export default function OffersManagement() {
+    const router = useRouter();
     const [offers, setOffers] = useState([]);
     const [verticals, setVerticals] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -13,13 +17,47 @@ export default function OffersManagement() {
     const [editingOffer, setEditingOffer] = useState(null);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(null);
     const [showAssignModal, setShowAssignModal] = useState(null);
+    
+    // Add auth check
+    useEffect(() => {
+        const token = localStorage.getItem('admin_token');
+        if (!token) {
+            router.push('/admin-login');
+        }
+    }, [router]);
+    
+    // Add authFetch helper
+    const authFetch = async (url, options = {}) => {
+        const token = localStorage.getItem('admin_token');
+        if (!token) {
+            router.push('/admin-login');
+            throw new Error('No authentication token');
+        }
+        
+        const response = await fetch(url, {
+            ...options,
+            headers: {
+                ...options.headers,
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (response.status === 401) {
+            localStorage.removeItem('admin_token');
+            router.push('/admin-login');
+            throw new Error('Authentication failed');
+        }
+
+        return response;
+    };
 
     const fetchOffers = async () => {
         try {
             setLoading(true);
             setError('');
 
-            const response = await fetch('/api/admin/simple-offers');
+            const response = await authFetch('/api/admin/simple-offers');
             const data = await response.json();
 
             if (response.ok) {
@@ -36,7 +74,7 @@ export default function OffersManagement() {
 
     const fetchVerticals = async () => {
         try {
-            const response = await fetch('/api/admin/verticals');
+            const response = await authFetch('/api/admin/verticals');
             const data = await response.json();
 
             if (response.ok) {
@@ -57,7 +95,7 @@ export default function OffersManagement() {
         };
 
         try {
-            const response = await fetch('/api/admin/simple-offers', {
+            const response = await authFetch('/api/admin/simple-offers', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(offerData)
@@ -92,7 +130,7 @@ export default function OffersManagement() {
         };
 
         try {
-            const response = await fetch('/api/admin/simple-offers', {
+            const response = await authFetch('/api/admin/simple-offers', {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(offerData)
@@ -114,7 +152,7 @@ export default function OffersManagement() {
 
     const assignOfferToVertical = async (offerId, verticalId) => {
         try {
-            const response = await fetch('/api/admin/assign-offer', {
+            const response = await authFetch('/api/admin/assign-offer', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ offer_id: offerId, vertical_id: parseInt(verticalId) })
@@ -135,7 +173,7 @@ export default function OffersManagement() {
 
     const handleDeleteOffer = async (offerId) => {
         try {
-            const response = await fetch(`/api/admin/simple-offers?offer_id=${offerId}`, {
+            const response = await authFetch(`/api/admin/simple-offers?offer_id=${offerId}`, {
                 method: 'DELETE'
             });
 

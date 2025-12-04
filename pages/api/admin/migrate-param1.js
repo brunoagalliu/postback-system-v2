@@ -1,7 +1,9 @@
 // File: pages/api/admin/migrate-param1.js
 import { getPool } from '../../../lib/database.js';
 
-export default async function handler(req, res) {
+import { requireAdmin } from '../../../lib/adminAuth.js';
+
+export default requireAdmin(async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ 
       success: false,
@@ -48,4 +50,4 @@ export default async function handler(req, res) {
   } finally {
     connection.release();
   }
-}
+});

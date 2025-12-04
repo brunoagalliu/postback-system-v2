@@ -22,11 +22,25 @@ export default function AdminDashboard() {
     const [flushLoading, setFlushLoading] = useState(false);
     const [flushingVertical, setFlushingVertical] = useState(null);
 
+    // ADD: Check authentication on mount
+    useEffect(() => {
+        const token = localStorage.getItem('admin_token');
+        if (!token) {
+            router.push('/admin-login');
+            return;
+        }
+    }, [router]);
+
+    // ADD: Helper function to make authenticated requests
     const authFetch = async (url, options = {}) => {
-        // Get token from localStorage (we'll set it up next)
         const token = localStorage.getItem('admin_token');
         
-        return fetch(url, {
+        if (!token) {
+            router.push('/admin-login');
+            throw new Error('No authentication token');
+        }
+        
+        const response = await fetch(url, {
             ...options,
             headers: {
                 ...options.headers,
@@ -34,16 +48,30 @@ export default function AdminDashboard() {
                 'Content-Type': 'application/json'
             }
         });
+
+        // If unauthorized, redirect to login
+        if (response.status === 401) {
+            localStorage.removeItem('admin_token');
+            router.push('/admin-login');
+            throw new Error('Authentication failed');
+        }
+
+        return response;
     };
-    
+
+    // ADD: Logout function
+    const handleLogout = () => {
+        localStorage.removeItem('admin_token');
+        router.push('/admin-login');
+    };
+
+    // UPDATE: Use authFetch instead of fetch
     const fetchStats = async () => {
         try {
             setLoading(true);
             setError('');
 
-            //const response = await fetch('/api/admin/stats');
-            const response = await authFetch('/api/admin/stats')
-
+            const response = await authFetch('/api/admin/stats');  // CHANGED
             const data = await response.json();
 
             if (response.ok) {
@@ -60,8 +88,7 @@ export default function AdminDashboard() {
 
     const fetchVerticals = async () => {
         try {
-            //const response = await fetch('/api/admin/verticals');
-            const response = await authFetch('/api/admin/verticals');
+            const response = await authFetch('/api/admin/verticals');  // CHANGED
             const data = await response.json();
 
             if (response.ok) {
@@ -82,9 +109,8 @@ export default function AdminDashboard() {
         };
 
         try {
-            const response = await fetch('/api/admin/verticals', {
+            const response = await authFetch('/api/admin/verticals', {  // CHANGED
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(verticalData)
             });
 
@@ -113,9 +139,8 @@ export default function AdminDashboard() {
         };
 
         try {
-            const response = await fetch('/api/admin/verticals', {
+            const response = await authFetch('/api/admin/verticals', {  // CHANGED
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(verticalData)
             });
 
@@ -143,9 +168,8 @@ export default function AdminDashboard() {
         };
 
         try {
-            const response = await fetch('/api/admin/assign-offer', {
+            const response = await authFetch('/api/admin/assign-offer', {  // CHANGED
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(assignmentData)
             });
 
@@ -172,7 +196,7 @@ export default function AdminDashboard() {
         try {
             setFlushLoading(true);
             
-            const response = await fetch('/api/admin/manual-flush', {
+            const response = await authFetch('/api/admin/manual-flush', {  // CHANGED
                 method: 'POST'
             });
             
@@ -181,7 +205,6 @@ export default function AdminDashboard() {
             if (result.success) {
                 alert(`Manual flush completed!\n\n${result.message}\n\nFlushed verticals: ${result.flushed_verticals}\nEastern Time: ${result.eastern_time}`);
                 
-                // Refresh stats to show updated cache amounts
                 fetchStats();
                 fetchVerticals();
             } else {
@@ -202,9 +225,8 @@ export default function AdminDashboard() {
         try {
             setFlushingVertical(vertical.id);
             
-            const response = await fetch('/api/admin/flush-vertical', {
+            const response = await authFetch('/api/admin/flush-vertical', {  // CHANGED
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ vertical_id: vertical.id })
             });
             
@@ -217,7 +239,6 @@ export default function AdminDashboard() {
                     alert(`Vertical "${vertical.name}" flushed successfully!\n\n${result.result.message}\nPostback: ${result.result.postback_success ? 'Success' : 'Failed'}\nEastern Time: ${result.eastern_time}`);
                 }
                 
-                // Refresh stats to show updated cache amounts
                 fetchStats();
                 fetchVerticals();
             } else {
@@ -231,16 +252,12 @@ export default function AdminDashboard() {
     };
 
     useEffect(() => {
-        const token = localStorage.getItem('admin_token');
-        if (!token) {
-            router.push('/admin-login');
-        }
         fetchStats();
         fetchVerticals();
         const interval = setInterval(() => {
             fetchStats();
             fetchVerticals();
-        }, 30000); // Refresh every 30 seconds
+        }, 30000);
         return () => clearInterval(interval);
     }, []);
 
@@ -264,7 +281,22 @@ export default function AdminDashboard() {
             </Head>
 
             <header style={{ marginBottom: '30px' }}>
-                <h1>Conversion Tracking Admin Dashboard</h1>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                    <h1>Conversion Tracking Admin Dashboard</h1>
+                    <button 
+                        onClick={handleLogout}
+                        style={{
+                            padding: '8px 16px',
+                            background: '#dc3545',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '4px',
+                            cursor: 'pointer'
+                        }}
+                    >
+                        Logout
+                    </button>
+                </div>
                 <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                     <button 
                         onClick={fetchStats}
