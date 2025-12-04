@@ -11,6 +11,49 @@ export default function VerticalDetails() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
 
+    // Check authentication on mount
+    useEffect(() => {
+        const token = localStorage.getItem('admin_token');
+        if (!token) {
+            router.push('/admin-login');
+            return;
+        }
+    }, [router]);
+
+    // Helper function to make authenticated requests
+    const authFetch = async (url, options = {}) => {
+        const token = localStorage.getItem('admin_token');
+        
+        if (!token) {
+            router.push('/admin-login');
+            throw new Error('No authentication token');
+        }
+        
+        const response = await fetch(url, {
+            ...options,
+            headers: {
+                ...options.headers,
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        // If unauthorized, redirect to login
+        if (response.status === 401) {
+            localStorage.removeItem('admin_token');
+            router.push('/admin-login');
+            throw new Error('Authentication failed');
+        }
+
+        return response;
+    };
+
+    // Logout function
+    const handleLogout = () => {
+        localStorage.removeItem('admin_token');
+        router.push('/admin-login');
+    };
+
     const fetchVerticalDetails = async () => {
         if (!id) return;
         
@@ -18,7 +61,7 @@ export default function VerticalDetails() {
             setLoading(true);
             setError('');
 
-            const response = await fetch(`/api/admin/vertical-details?vertical_id=${id}`);
+            const response = await authFetch(`/api/admin/vertical-details?vertical_id=${id}`);
             const data = await response.json();
 
             if (response.ok) {
@@ -77,21 +120,37 @@ export default function VerticalDetails() {
 
             {/* Header */}
             <header style={{ marginBottom: '30px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '20px', marginBottom: '10px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+                        <button 
+                            onClick={() => router.back()}
+                            style={{
+                                padding: '8px 16px',
+                                background: '#6c757d',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '4px',
+                                cursor: 'pointer'
+                            }}
+                        >
+                            ← Back
+                        </button>
+                        <h1 style={{ margin: 0 }}>Vertical: {vertical.name}</h1>
+                    </div>
                     <button 
-                        onClick={() => router.back()}
+                        onClick={handleLogout}
                         style={{
                             padding: '8px 16px',
-                            background: '#6c757d',
+                            background: '#dc3545',
                             color: 'white',
                             border: 'none',
                             borderRadius: '4px',
-                            cursor: 'pointer'
+                            cursor: 'pointer',
+                            fontSize: '14px'
                         }}
                     >
-                        ← Back
+                        🚪 Logout
                     </button>
-                    <h1 style={{ margin: 0 }}>Vertical: {vertical.name}</h1>
                 </div>
                 
                 <div style={{ color: '#666', fontSize: '14px' }}>
