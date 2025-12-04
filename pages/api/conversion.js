@@ -119,7 +119,7 @@ export default async function handler(req, res) {
         message: `Unknown offer ${offer_id} - firing postback directly without caching. Amount: $${sumValue.toFixed(2)}, param1: ${param1Value}`
       });
 
-      const redtrackUrl = `https://clks.trackthisclicks.com/postback?clickid=${encodeURIComponent(clickid)}&sum=${encodeURIComponent(sumValue)}&offer_id=${encodeURIComponent(offer_id)}&param1=${encodeURIComponent(param1Value)}`;
+      const redtrackUrl = `https://clks.trackthisclicks.com/postback?clickid=${encodeURIComponent(clickid)}&sum=${encodeURIComponent(sumValue)}&offer_id=${encodeURIComponent(offer_id)}&sub1=${encodeURIComponent(param1Value)}`;
       
       let postbackSuccess = false;
       let responseText = '';
@@ -217,7 +217,7 @@ export default async function handler(req, res) {
     const totalSumToSend = sumValue + verticalCachedSum;
     const triggerParam1 = param1Value; // Use the current param1 that triggered, not cumulative
     
-    const redtrackUrl = `https://clks.trackthisclicks.com/postback?clickid=${encodeURIComponent(clickid)}&sum=${encodeURIComponent(totalSumToSend)}&offer_id=${encodeURIComponent(offer_id)}&param1=${encodeURIComponent(triggerParam1)}`;
+    const redtrackUrl = `https://clks.trackthisclicks.com/postback?clickid=${encodeURIComponent(clickid)}&sum=${encodeURIComponent(totalSumToSend)}&offer_id=${encodeURIComponent(offer_id)}&sub1=${encodeURIComponent(triggerParam1)}`;
     
     // Get list of all offers in the same vertical for logging
     const offersInVertical = await getOffersInSameVertical(offer_id);
