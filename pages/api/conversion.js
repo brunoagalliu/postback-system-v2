@@ -1,110 +1,56 @@
-// File: pages/api/conversion.js - Clean version without auto-flush
+// File: pages/api/conversion.js - Updated to use param1 for threshold triggering
 import {
   initializeDatabase,
   addCachedConversion,
-  getCachedTotalByOffer,
+  getCachedTotalByVertical,
   getVerticalPayoutThreshold,
   getOfferVertical,
   logConversion,
   logPostback,
-  getSimpleOfferById
- } from '../../lib/database.js';
- 
- // Function to validate RedTrack clickid format
- function isValidClickid(clickid) {
-   if (!clickid || typeof clickid !== 'string') {
-     return false;
-   }
-   
-   // RedTrack clickids are exactly 24 characters long
-   // and contain alphanumeric characters (0-9, a-z, A-Z)
-   const clickidRegex = /^[0-9a-zA-Z]{24}$/;
-   return clickidRegex.test(clickid);
- }
- 
- // Function to validate offer ID
- function isValidOfferId(offer_id) {
-   if (!offer_id || typeof offer_id !== 'string') {
-     return false;
-   }
-   
-   // Offer ID should be alphanumeric and reasonable length (1-50 characters)
-   // Allow letters, numbers, hyphens, and underscores
-   const offerIdRegex = /^[a-zA-Z0-9_-]{1,50}$/;
-   return offerIdRegex.test(offer_id);
- }
- 
- // Function to get all cached amount for offers in the same vertical
- async function getCachedTotalByVertical(offer_id) {
-   const { getPool } = await import('../../lib/database.js');
-   const connection = await getPool().getConnection();
-   
-   try {
-     const [rows] = await connection.execute(`
-       SELECT COALESCE(SUM(cc.amount), 0) as total
-       FROM cached_conversions cc
-       JOIN offer_verticals ov1 ON cc.offer_id = ov1.offer_id
-       JOIN offer_verticals ov2 ON ov1.vertical_id = ov2.vertical_id
-       WHERE ov2.offer_id = ?
-     `, [offer_id]);
-     
-     return parseFloat(rows[0].total);
-   } finally {
-     connection.release();
-   }
- }
- 
- // Function to clear cache for all offers in the same vertical
- async function clearCacheByVertical(offer_id) {
-   const { getPool } = await import('../../lib/database.js');
-   const connection = await getPool().getConnection();
-   
-   try {
-     const [result] = await connection.execute(`
-       DELETE cc FROM cached_conversions cc
-       JOIN offer_verticals ov1 ON cc.offer_id = ov1.offer_id
-       JOIN offer_verticals ov2 ON ov1.vertical_id = ov2.vertical_id
-       WHERE ov2.offer_id = ?
-     `, [offer_id]);
-     
-     return result.affectedRows;
-   } finally {
-     connection.release();
-   }
- }
- 
- // Function to get all offers in the same vertical
- async function getOffersInSameVertical(offer_id) {
-   const { getPool } = await import('../../lib/database.js');
-   const connection = await getPool().getConnection();
-   
-   try {
-     const [rows] = await connection.execute(`
-       SELECT DISTINCT ov1.offer_id
-       FROM offer_verticals ov1
-       JOIN offer_verticals ov2 ON ov1.vertical_id = ov2.vertical_id
-       WHERE ov2.offer_id = ?
-     `, [offer_id]);
-     
-     return rows.map(row => row.offer_id);
-   } finally {
-     connection.release();
-   }
- }
- 
- export default async function handler(req, res) {
+  getSimpleOfferById,
+  clearCacheByVertical,
+  getOffersInSameVertical
+} from '../../lib/database.js';
+
+// Function to validate RedTrack clickid format
+function isValidClickid(clickid) {
+  if (!clickid || typeof clickid !== 'string') {
+    return false;
+  }
+  
+  // RedTrack clickids are exactly 24 characters long
+  // and contain alphanumeric characters (0-9, a-z, A-Z)
+  const clickidRegex = /^[0-9a-zA-Z]{24}$/;
+  return clickidRegex.test(clickid);
+}
+
+// Function to validate offer ID
+function isValidOfferId(offer_id) {
+  if (!offer_id || typeof offer_id !== 'string') {
+    return false;
+  }
+  
+  // Offer ID should be alphanumeric and reasonable length (1-50 characters)
+  // Allow letters, numbers, hyphens, and underscores
+  const offerIdRegex = /^[a-zA-Z0-9_-]{1,50}$/;
+  return offerIdRegex.test(offer_id);
+}
+
+export default async function handler(req, res) {
   try {
     await initializeDatabase();
     
-    const { clickid, sum, offer_id } = req.query;
+    const { clickid, sum, offer_id, param1 } = req.query;
     const sumValue = parseFloat(sum || 0);
+    const param1Value = parseFloat(param1 || 0);
     
     await logConversion({
       clickid,
       offer_id,
       original_amount: sumValue,
+      original_param1: param1Value,
       action: 'request_received',
-      message: `Request received: clickid=${clickid}, offer_id=${offer_id}, sum=${sum}`
+      message: `Request received: clickid=${clickid}, offer_id=${offer_id}, sum=${sum}, param1=${param1}`
     });
     
     // Validate clickid format
@@ -113,6 +59,7 @@ import {
         clickid,
         offer_id,
         original_amount: sumValue,
+        original_param1: param1Value,
         action: 'invalid_clickid',
         message: `Invalid clickid format rejected: '${clickid}' (must be 24 alphanumeric characters)`
       });
@@ -125,6 +72,7 @@ import {
         clickid,
         offer_id,
         original_amount: sumValue,
+        original_param1: param1Value,
         action: 'invalid_offer_id',
         message: `Invalid offer_id format rejected: '${offer_id}' (must be 1-50 alphanumeric characters, hyphens, or underscores)`
       });
@@ -137,8 +85,22 @@ import {
         clickid,
         offer_id,
         original_amount: sumValue,
+        original_param1: param1Value,
         action: 'validation_failed',
         message: `Invalid sum value rejected: clickid=${clickid}, offer_id=${offer_id}, sum=${sum}`
+      });
+      return res.status(200).send("0");
+    }
+
+    // Validate param1 value
+    if (param1Value <= 0) {
+      await logConversion({
+        clickid,
+        offer_id,
+        original_amount: sumValue,
+        original_param1: param1Value,
+        action: 'validation_failed',
+        message: `Invalid param1 value rejected: clickid=${clickid}, offer_id=${offer_id}, param1=${param1}`
       });
       return res.status(200).send("0");
     }
@@ -152,11 +114,12 @@ import {
         clickid,
         offer_id,
         original_amount: sumValue,
+        original_param1: param1Value,
         action: 'unknown_offer_direct_fire',
-        message: `Unknown offer ${offer_id} - firing postback directly without caching. Amount: $${sumValue.toFixed(2)}`
+        message: `Unknown offer ${offer_id} - firing postback directly without caching. Amount: $${sumValue.toFixed(2)}, param1: ${param1Value}`
       });
 
-      const redtrackUrl = `https://clks.trackthisclicks.com/postback?clickid=${encodeURIComponent(clickid)}&sum=${encodeURIComponent(sumValue)}&offer_id=${encodeURIComponent(offer_id)}`;
+      const redtrackUrl = `https://clks.trackthisclicks.com/postback?clickid=${encodeURIComponent(clickid)}&sum=${encodeURIComponent(sumValue)}&offer_id=${encodeURIComponent(offer_id)}&param1=${encodeURIComponent(param1Value)}`;
       
       let postbackSuccess = false;
       let responseText = '';
@@ -174,9 +137,11 @@ import {
           clickid,
           offer_id,
           original_amount: sumValue,
+          original_param1: param1Value,
           total_sent: sumValue,
+          trigger_param1: param1Value,
           action: 'unknown_offer_postback_success',
-          message: `Direct postback successful for unknown offer ${offer_id}. Amount: $${sumValue.toFixed(2)}, Response: ${responseText}`
+          message: `Direct postback successful for unknown offer ${offer_id}. Amount: $${sumValue.toFixed(2)}, param1: ${param1Value}, Response: ${responseText}`
         });
         
       } catch (error) {
@@ -186,13 +151,15 @@ import {
           clickid,
           offer_id,
           original_amount: sumValue,
+          original_param1: param1Value,
           total_sent: sumValue,
+          trigger_param1: param1Value,
           action: 'unknown_offer_postback_failed',
-          message: `Direct postback failed for unknown offer ${offer_id}. Amount: $${sumValue.toFixed(2)}, Error: ${error.message}`
+          message: `Direct postback failed for unknown offer ${offer_id}. Amount: $${sumValue.toFixed(2)}, param1: ${param1Value}, Error: ${error.message}`
         });
       }
       
-      await logPostback(clickid, offer_id, sumValue, redtrackUrl, postbackSuccess, responseText, errorMessage);
+      await logPostback(clickid, offer_id, sumValue, param1Value, redtrackUrl, postbackSuccess, responseText, errorMessage);
       
       if (postbackSuccess) {
         return res.status(200).send("2");
@@ -210,37 +177,47 @@ import {
     const verticalInfo = await getOfferVertical(offer_id);
     const verticalName = verticalInfo ? verticalInfo.name : 'Unassigned';
     
-    // Get cached total for ALL offers in the same vertical
-    const verticalCachedTotal = await getCachedTotalByVertical(offer_id);
+    // Get cached sum total for ALL offers in the same vertical
+    const verticalCachedSum = await getCachedTotalByVertical(offer_id);
     
     await logConversion({
       clickid,
       offer_id,
       original_amount: sumValue,
-      cached_amount: verticalCachedTotal,
+      original_param1: param1Value,
+      cached_amount: verticalCachedSum,
       action: 'known_offer_cache_loaded',
-      message: `Known offer: ${offerExists.offer_name || offer_id}. Vertical "${verticalName}" cached total: $${verticalCachedTotal.toFixed(2)}, New conversion: $${sumValue.toFixed(2)}, Payout threshold: $${payoutThreshold.toFixed(2)}`
+      message: `Known offer: ${offerExists.offer_name || offer_id}. Vertical "${verticalName}" cached sum: $${verticalCachedSum.toFixed(2)}, New sum: $${sumValue.toFixed(2)}, New param1: ${param1Value}, Threshold: ${payoutThreshold.toFixed(2)}`
     });
     
-    if (sumValue < payoutThreshold) {
-      await addCachedConversion(clickid, offer_id, sumValue);
-      const newVerticalCachedTotal = await getCachedTotalByVertical(offer_id);
+    // KEY CHANGE: Check CURRENT param1 against threshold (not sum, not cumulative param1)
+    if (param1Value < payoutThreshold) {
+      // Cache both sum and param1
+      await addCachedConversion(clickid, offer_id, sumValue, param1Value);
+      const newVerticalCachedSum = await getCachedTotalByVertical(offer_id);
       
       await logConversion({
         clickid,
         offer_id,
         original_amount: sumValue,
-        cached_amount: newVerticalCachedTotal,
+        original_param1: param1Value,
+        cached_amount: newVerticalCachedSum,
         action: 'cached_conversion',
-        message: `Cached sub-$${payoutThreshold.toFixed(2)} conversion ($${sumValue.toFixed(2)}) for offer ${offer_id} (${offerExists.offer_name || 'No name'}). New vertical "${verticalName}" total cached: $${newVerticalCachedTotal.toFixed(2)}`
+        message: `Cached conversion (param1 ${param1Value} < threshold ${payoutThreshold.toFixed(2)}). Cached sum: $${sumValue.toFixed(2)}, param1: ${param1Value}. New vertical "${verticalName}" cached sum total: $${newVerticalCachedSum.toFixed(2)}`
       });
       
       return res.status(200).send("1");
     }
     
-    // When threshold is reached, sum ALL cached conversions from the same vertical
-    const totalToSend = sumValue + verticalCachedTotal;
-    const redtrackUrl = `https://clks.trackthisclicks.com/postback?clickid=${encodeURIComponent(clickid)}&sum=${encodeURIComponent(totalToSend)}&offer_id=${encodeURIComponent(offer_id)}`;
+    // THRESHOLD REACHED: param1 >= payoutThreshold
+    // Fire postback with:
+    // - sum = current sum + all cached sums
+    // - param1 = current param1 (the triggering value)
+    
+    const totalSumToSend = sumValue + verticalCachedSum;
+    const triggerParam1 = param1Value; // Use the current param1 that triggered, not cumulative
+    
+    const redtrackUrl = `https://clks.trackthisclicks.com/postback?clickid=${encodeURIComponent(clickid)}&sum=${encodeURIComponent(totalSumToSend)}&offer_id=${encodeURIComponent(offer_id)}&param1=${encodeURIComponent(triggerParam1)}`;
     
     // Get list of all offers in the same vertical for logging
     const offersInVertical = await getOffersInSameVertical(offer_id);
@@ -249,26 +226,32 @@ import {
       clickid,
       offer_id,
       original_amount: sumValue,
-      cached_amount: verticalCachedTotal,
-      total_sent: totalToSend,
+      original_param1: param1Value,
+      cached_amount: verticalCachedSum,
+      total_sent: totalSumToSend,
+      trigger_param1: triggerParam1,
       action: 'preparing_postback',
-      message: `Preparing to send postback to RedTrack for offer ${offer_id} (${offerExists.offer_name || 'No name'}) in vertical "${verticalName}". Total: $${totalToSend.toFixed(2)} (Current conversion: $${sumValue.toFixed(2)} + Vertical cache: $${verticalCachedTotal.toFixed(2)}) - Triggered by $${payoutThreshold.toFixed(2)} threshold. Offers in vertical: ${offersInVertical.join(', ')}`
+      message: `Preparing postback for offer ${offer_id} (${offerExists.offer_name || 'No name'}) in vertical "${verticalName}". Trigger: param1=${triggerParam1} >= threshold ${payoutThreshold.toFixed(2)}. Sending sum=$${totalSumToSend.toFixed(2)} (current $${sumValue.toFixed(2)} + cached $${verticalCachedSum.toFixed(2)}), param1=${triggerParam1}. Offers in vertical: ${offersInVertical.offers.join(', ')}`
     });
     
-    if (verticalCachedTotal > 0) {
+    // Clear cache before firing postback
+    if (verticalCachedSum > 0) {
       const clearedRows = await clearCacheByVertical(offer_id);
       
       await logConversion({
         clickid,
         offer_id,
         original_amount: sumValue,
-        cached_amount: verticalCachedTotal,
-        total_sent: totalToSend,
+        original_param1: param1Value,
+        cached_amount: verticalCachedSum,
+        total_sent: totalSumToSend,
+        trigger_param1: triggerParam1,
         action: 'vertical_cache_cleared',
-        message: `Vertical "${verticalName}" cache cleared before postback. Removed ${clearedRows} cached entries from ALL offers in vertical (${offersInVertical.join(', ')}). Total sent: $${totalToSend.toFixed(2)}`
+        message: `Vertical "${verticalName}" cache cleared before postback. Removed ${clearedRows} cached entries from ALL offers in vertical (${offersInVertical.offers.join(', ')}). Total sum sent: $${totalSumToSend.toFixed(2)}, trigger param1: ${triggerParam1}`
       });
     }
     
+    // Fire the postback
     let postbackSuccess = false;
     let responseText = '';
     let errorMessage = null;
@@ -285,10 +268,12 @@ import {
         clickid,
         offer_id,
         original_amount: sumValue,
-        cached_amount: verticalCachedTotal,
-        total_sent: totalToSend,
+        original_param1: param1Value,
+        cached_amount: verticalCachedSum,
+        total_sent: totalSumToSend,
+        trigger_param1: triggerParam1,
         action: 'postback_success',
-        message: `Postback successful for offer ${offer_id} (${offerExists.offer_name || 'No name'}) in vertical "${verticalName}". Response: ${responseText}`
+        message: `Postback successful for offer ${offer_id} (${offerExists.offer_name || 'No name'}) in vertical "${verticalName}". Sum sent: $${totalSumToSend.toFixed(2)}, param1: ${triggerParam1}. Response: ${responseText}`
       });
       
     } catch (error) {
@@ -298,14 +283,17 @@ import {
         clickid,
         offer_id,
         original_amount: sumValue,
-        cached_amount: verticalCachedTotal,
-        total_sent: totalToSend,
+        original_param1: param1Value,
+        cached_amount: verticalCachedSum,
+        total_sent: totalSumToSend,
+        trigger_param1: triggerParam1,
         action: 'postback_failed',
         message: `Error sending postback for offer ${offer_id} (${offerExists.offer_name || 'No name'}) in vertical "${verticalName}": ${error.message}`
       });
     }
     
-    await logPostback(clickid, offer_id, totalToSend, redtrackUrl, postbackSuccess, responseText, errorMessage);
+    // Log the postback attempt
+    await logPostback(clickid, offer_id, totalSumToSend, triggerParam1, redtrackUrl, postbackSuccess, responseText, errorMessage);
     
     if (postbackSuccess) {
       return res.status(200).send("2");
@@ -329,4 +317,4 @@ import {
     
     return res.status(200).send("4");
   }
- }
+}
