@@ -1,8 +1,10 @@
 // File: pages/admin.js
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/router';
 import Head from 'next/head';
 
 export default function AdminDashboard() {
+    const router = useRouter();
     const [stats, setStats] = useState(null);
     const [verticals, setVerticals] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -20,12 +22,28 @@ export default function AdminDashboard() {
     const [flushLoading, setFlushLoading] = useState(false);
     const [flushingVertical, setFlushingVertical] = useState(null);
 
+    const authFetch = async (url, options = {}) => {
+        // Get token from localStorage (we'll set it up next)
+        const token = localStorage.getItem('admin_token');
+        
+        return fetch(url, {
+            ...options,
+            headers: {
+                ...options.headers,
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+    };
+    
     const fetchStats = async () => {
         try {
             setLoading(true);
             setError('');
 
-            const response = await fetch('/api/admin/stats');
+            //const response = await fetch('/api/admin/stats');
+            const response = await authFetch('/api/admin/stats')
+
             const data = await response.json();
 
             if (response.ok) {
@@ -42,7 +60,8 @@ export default function AdminDashboard() {
 
     const fetchVerticals = async () => {
         try {
-            const response = await fetch('/api/admin/verticals');
+            //const response = await fetch('/api/admin/verticals');
+            const response = await authFetch('/api/admin/verticals');
             const data = await response.json();
 
             if (response.ok) {
@@ -212,6 +231,10 @@ export default function AdminDashboard() {
     };
 
     useEffect(() => {
+        const token = localStorage.getItem('admin_token');
+        if (!token) {
+            router.push('/admin-login');
+        }
         fetchStats();
         fetchVerticals();
         const interval = setInterval(() => {

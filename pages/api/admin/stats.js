@@ -1,5 +1,6 @@
 // File: pages/api/admin/stats.js
 import mysql from 'mysql2/promise';
+import { requireAdmin } from '../../../lib/adminAuth.js';
 
 // Database connection configuration
 const dbConfig = {
@@ -51,7 +52,7 @@ async function checkColumnExists(connection, tableName, columnName) {
   }
 }
 
-export default async function handler(req, res) {
+export default requireAdmin(async function handler(req, res) {
   try {
     const pool = getPool();
 
@@ -384,4 +385,4 @@ export default async function handler(req, res) {
       sqlMessage: error.sqlMessage || null
     });
   }
-}
+});
