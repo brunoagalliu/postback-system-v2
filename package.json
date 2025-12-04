@@ -41,7 +41,7 @@
   "bugs": {
     "url": "https://github.com/brunoagalliu/conversion-tracker/issues"
   },
-  "homepage": "https://pb.trackthisclicks.com",
+  "homepage": "https://ca.trackthisclicks.com",
   "engines": {
     "node": ">=18.0.0"
   }
