@@ -1,6 +1,5 @@
 // File: pages/api/admin/init-offers.js
-import { initializeOffersTable } from '../../../lib/database.js';
-
+import { initializeSimpleOffersTable } from '../../../lib/database.js';  // CHANGED
 import { requireAdmin } from '../../../lib/adminAuth.js';
 
 export default requireAdmin(async function handler(req, res) {
@@ -12,7 +11,7 @@ export default requireAdmin(async function handler(req, res) {
   }
 
   try {
-    await initializeOffersTable();
+    await initializeSimpleOffersTable();  // CHANGED
     
     return res.status(200).json({
       success: true,
