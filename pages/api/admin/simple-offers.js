@@ -77,7 +77,7 @@ export default requireAdmin(async function handler(req, res) {
             clickid: 'admin',
             offer_id: offer_id,
             action: 'offer_created',
-            message: `Admin created offer: ${offer_name || offer_id} (${offer_id}) - Mode: ${mode || 'simple'}${mode === 'advanced' ? `, Trigger: $${trigger_amount}, Low Event: ${low_event_type}, High Event: ''` : ''}`
+            message: `Admin created offer: ${offer_name || offer_id} (${offer_id}) - Mode: ${mode || 'simple'}${mode === 'advanced' ? `, Trigger: $${trigger_amount}, Low Event: ${low_event_type}, High Event: ${high_event_type || 'Purchase'}` : ''}`
           });
 
           return res.status(200).json({
@@ -149,7 +149,7 @@ export default requireAdmin(async function handler(req, res) {
           clickid: 'admin',
           offer_id: updateOfferId,
           action: 'offer_updated',
-          message: `Admin updated offer: ${updateOfferName || updateOfferId} (${updateOfferId}) - Mode: ${updateMode || 'simple'}${updateMode === 'advanced' ? `, Trigger: $${updateTriggerAmount}, Low Event: ${updateLowEventType}, High Event: ''` : ''}`
+          message: `Admin updated offer: ${updateOfferName || updateOfferId} (${updateOfferId}) - Mode: ${updateMode || 'simple'}${updateMode === 'advanced' ? `, Trigger: $${updateTriggerAmount}, Low Event: ${updateLowEventType}, High Event: ${updateHighEventType || 'Purchase'}` : ''}`
         });
 
         return res.status(200).json({
