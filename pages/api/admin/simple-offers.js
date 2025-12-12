@@ -21,7 +21,14 @@ export default requireAdmin(async function handler(req, res) {
 
       case 'POST':
         // Create new offer
-        const { offer_id, offer_name } = req.body;
+        const { 
+          offer_id, 
+          offer_name,
+          mode,
+          trigger_amount,
+          low_event_type,
+          high_event_type
+        } = req.body;
         
         if (!offer_id) {
           return res.status(400).json({
@@ -39,20 +46,43 @@ export default requireAdmin(async function handler(req, res) {
           });
         }
 
+        // Validate advanced mode fields
+        if (mode === 'advanced') {
+          if (!trigger_amount || trigger_amount <= 0) {
+            return res.status(400).json({
+              success: false,
+              message: 'Trigger amount is required for advanced mode and must be greater than 0'
+            });
+          }
+          if (!low_event_type) {
+            return res.status(400).json({
+              success: false,
+              message: 'Low event type is required for advanced mode'
+            });
+          }
+        }
+
         try {
-          await createSimpleOffer(offer_id, offer_name || '');
+          await createSimpleOffer(
+            offer_id, 
+            offer_name || '', 
+            mode || 'simple',
+            mode === 'advanced' ? parseFloat(trigger_amount) : null,
+            mode === 'advanced' ? low_event_type : null,
+            mode === 'advanced' ? (high_event_type || null) : null
+          );
           
           // Log the offer creation
           await logConversion({
             clickid: 'admin',
             offer_id: offer_id,
             action: 'offer_created',
-            message: `Admin created offer: ${offer_name || offer_id} (${offer_id})`
+            message: `Admin created offer: ${offer_name || offer_id} (${offer_id}) - Mode: ${mode || 'simple'}${mode === 'advanced' ? `, Trigger: $${trigger_amount}, Low Event: ${low_event_type}, High Event: ${high_event_type || 'Purchase'}` : ''}`
           });
 
           return res.status(200).json({
             success: true,
-            message: `Offer "${offer_id}" created successfully`
+            message: `Offer "${offer_id}" created successfully in ${mode || 'simple'} mode`
           });
         } catch (error) {
           if (error.code === 'ER_DUP_ENTRY') {
@@ -66,7 +96,14 @@ export default requireAdmin(async function handler(req, res) {
 
       case 'PUT':
         // Update existing offer
-        const { offer_id: updateOfferId, offer_name: updateOfferName } = req.body;
+        const { 
+          offer_id: updateOfferId, 
+          offer_name: updateOfferName,
+          mode: updateMode,
+          trigger_amount: updateTriggerAmount,
+          low_event_type: updateLowEventType,
+          high_event_type: updateHighEventType
+        } = req.body;
         
         if (!updateOfferId) {
           return res.status(400).json({
@@ -75,7 +112,30 @@ export default requireAdmin(async function handler(req, res) {
           });
         }
 
-        const affectedRows = await updateSimpleOffer(updateOfferId, updateOfferName || '');
+        // Validate advanced mode fields
+        if (updateMode === 'advanced') {
+          if (!updateTriggerAmount || updateTriggerAmount <= 0) {
+            return res.status(400).json({
+              success: false,
+              message: 'Trigger amount is required for advanced mode and must be greater than 0'
+            });
+          }
+          if (!updateLowEventType) {
+            return res.status(400).json({
+              success: false,
+              message: 'Low event type is required for advanced mode'
+            });
+          }
+        }
+
+        const affectedRows = await updateSimpleOffer(
+          updateOfferId, 
+          updateOfferName || '', 
+          updateMode || 'simple',
+          updateMode === 'advanced' ? parseFloat(updateTriggerAmount) : null,
+          updateMode === 'advanced' ? updateLowEventType : null,
+          updateMode === 'advanced' ? (updateHighEventType || null) : null
+        );
 
         if (affectedRows === 0) {
           return res.status(404).json({
@@ -89,7 +149,7 @@ export default requireAdmin(async function handler(req, res) {
           clickid: 'admin',
           offer_id: updateOfferId,
           action: 'offer_updated',
-          message: `Admin updated offer: ${updateOfferName || updateOfferId} (${updateOfferId})`
+          message: `Admin updated offer: ${updateOfferName || updateOfferId} (${updateOfferId}) - Mode: ${updateMode || 'simple'}${updateMode === 'advanced' ? `, Trigger: $${updateTriggerAmount}, Low Event: ${updateLowEventType}, High Event: ${updateHighEventType || 'Purchase'}` : ''}`
         });
 
         return res.status(200).json({

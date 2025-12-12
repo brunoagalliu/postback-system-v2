@@ -1,4 +1,4 @@
-// File: pages/api/conversion.js - Updated to use param1 for threshold triggering
+// File: pages/api/conversion.js - COMPLETE FILE with Advanced Mode
 import {
   initializeDatabase,
   addCachedConversion,
@@ -7,7 +7,7 @@ import {
   getOfferVertical,
   logConversion,
   logPostback,
-  getSimpleOfferById,
+  getOfferWithMode,
   clearCacheByVertical,
   getOffersInSameVertical
 } from '../../lib/database.js';
@@ -18,8 +18,6 @@ function isValidClickid(clickid) {
     return false;
   }
   
-  // RedTrack clickids are exactly 24 characters long
-  // and contain alphanumeric characters (0-9, a-z, A-Z)
   const clickidRegex = /^[0-9a-zA-Z]{24}$/;
   return clickidRegex.test(clickid);
 }
@@ -30,8 +28,6 @@ function isValidOfferId(offer_id) {
     return false;
   }
   
-  // Offer ID should be alphanumeric and reasonable length (1-50 characters)
-  // Allow letters, numbers, hyphens, and underscores
   const offerIdRegex = /^[a-zA-Z0-9_-]{1,50}$/;
   return offerIdRegex.test(offer_id);
 }
@@ -105,8 +101,8 @@ export default async function handler(req, res) {
       return res.status(200).send("0");
     }
 
-    // Check if offer exists in our system
-    const offerExists = await getSimpleOfferById(offer_id);
+    // Check if offer exists in our system (now with mode info)
+    const offerExists = await getOfferWithMode(offer_id);
     
     if (!offerExists) {
       // UNKNOWN OFFER: Fire postback directly without caching
@@ -168,7 +164,89 @@ export default async function handler(req, res) {
       }
     }
 
-    // KNOWN OFFER: Process normally with caching system
+    // ====================
+    // ADVANCED MODE CHECK
+    // ====================
+    if (offerExists.mode === 'advanced') {
+      // ADVANCED MODE: Fire every conversion immediately with event type
+      
+      const triggerAmount = offerExists.trigger_amount || 50;
+      const isLowConversion = param1Value < triggerAmount;
+      
+      // Determine event type
+      let eventType = '';
+      if (isLowConversion) {
+        eventType = offerExists.low_event_type || 'CompleteRegistration';
+      } else {
+        eventType = offerExists.high_event_type || 'Purchase';
+      }
+      
+      // Build postback URL with event type
+      const redtrackUrl = `https://clks.trackthisclicks.com/postback?clickid=${encodeURIComponent(clickid)}&sum=${encodeURIComponent(sumValue)}&offer_id=${encodeURIComponent(offer_id)}&sub1=${encodeURIComponent(param1Value)}&type=${encodeURIComponent(eventType)}`;
+      
+      await logConversion({
+        clickid,
+        offer_id,
+        original_amount: sumValue,
+        original_param1: param1Value,
+        total_sent: sumValue,
+        trigger_param1: param1Value,
+        action: 'advanced_mode_direct_fire',
+        message: `Advanced mode: Firing ${isLowConversion ? 'LOW' : 'HIGH'} conversion directly. param1=${param1Value}, trigger=${triggerAmount}, event=${eventType}, sum=$${sumValue.toFixed(2)}`
+      });
+      
+      // Fire the postback
+      let postbackSuccess = false;
+      let responseText = '';
+      let errorMessage = null;
+      
+      try {
+        const response = await fetch(redtrackUrl);
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        responseText = await response.text();
+        postbackSuccess = true;
+        
+        await logConversion({
+          clickid,
+          offer_id,
+          original_amount: sumValue,
+          original_param1: param1Value,
+          total_sent: sumValue,
+          trigger_param1: param1Value,
+          action: 'advanced_mode_postback_success',
+          message: `Advanced mode postback successful. Event: ${eventType}, Amount: $${sumValue.toFixed(2)}, param1: ${param1Value}, Response: ${responseText}`
+        });
+        
+      } catch (error) {
+        errorMessage = error.message;
+        
+        await logConversion({
+          clickid,
+          offer_id,
+          original_amount: sumValue,
+          original_param1: param1Value,
+          total_sent: sumValue,
+          trigger_param1: param1Value,
+          action: 'advanced_mode_postback_failed',
+          message: `Advanced mode postback failed. Event: ${eventType}, Amount: $${sumValue.toFixed(2)}, param1: ${param1Value}, Error: ${error.message}`
+        });
+      }
+      
+      // Log the postback attempt
+      await logPostback(clickid, offer_id, sumValue, param1Value, redtrackUrl, postbackSuccess, responseText, errorMessage);
+      
+      if (postbackSuccess) {
+        return res.status(200).send("2");
+      } else {
+        return res.status(200).send("3");
+      }
+    }
+
+    // ====================
+    // SIMPLE MODE (EXISTING CACHING LOGIC)
+    // ====================
     
     // Get payout threshold for this offer's vertical (defaults to 10.00 if no vertical assigned)
     const payoutThreshold = await getVerticalPayoutThreshold(offer_id);
@@ -186,8 +264,8 @@ export default async function handler(req, res) {
       original_amount: sumValue,
       original_param1: param1Value,
       cached_amount: verticalCachedSum,
-      action: 'known_offer_cache_loaded',
-      message: `Known offer: ${offerExists.offer_name || offer_id}. Vertical "${verticalName}" cached sum: $${verticalCachedSum.toFixed(2)}, New sum: $${sumValue.toFixed(2)}, New param1: ${param1Value}, Threshold: ${payoutThreshold.toFixed(2)}`
+      action: 'simple_mode_cache_loaded',
+      message: `Simple mode offer: ${offerExists.offer_name || offer_id}. Vertical "${verticalName}" cached sum: $${verticalCachedSum.toFixed(2)}, New sum: $${sumValue.toFixed(2)}, New param1: ${param1Value}, Threshold: ${payoutThreshold.toFixed(2)}`
     });
     
     // KEY CHANGE: Check CURRENT param1 against threshold (not sum, not cumulative param1)
@@ -212,10 +290,10 @@ export default async function handler(req, res) {
     // THRESHOLD REACHED: param1 >= payoutThreshold
     // Fire postback with:
     // - sum = current sum + all cached sums
-    // - param1 = current param1 (the triggering value)
+    // - sub1 = current param1 (the triggering value)
     
     const totalSumToSend = sumValue + verticalCachedSum;
-    const triggerParam1 = param1Value; // Use the current param1 that triggered, not cumulative
+    const triggerParam1 = param1Value;
     
     const redtrackUrl = `https://clks.trackthisclicks.com/postback?clickid=${encodeURIComponent(clickid)}&sum=${encodeURIComponent(totalSumToSend)}&offer_id=${encodeURIComponent(offer_id)}&sub1=${encodeURIComponent(triggerParam1)}`;
     
@@ -231,7 +309,7 @@ export default async function handler(req, res) {
       total_sent: totalSumToSend,
       trigger_param1: triggerParam1,
       action: 'preparing_postback',
-      message: `Preparing postback for offer ${offer_id} (${offerExists.offer_name || 'No name'}) in vertical "${verticalName}". Trigger: param1=${triggerParam1} >= threshold ${payoutThreshold.toFixed(2)}. Sending sum=$${totalSumToSend.toFixed(2)} (current $${sumValue.toFixed(2)} + cached $${verticalCachedSum.toFixed(2)}), param1=${triggerParam1}. Offers in vertical: ${offersInVertical.offers.join(', ')}`
+      message: `Preparing postback for offer ${offer_id} (${offerExists.offer_name || 'No name'}) in vertical "${verticalName}". Trigger: param1=${triggerParam1} >= threshold ${payoutThreshold.toFixed(2)}. Sending sum=$${totalSumToSend.toFixed(2)} (current $${sumValue.toFixed(2)} + cached $${verticalCachedSum.toFixed(2)}), sub1=${triggerParam1}. Offers in vertical: ${offersInVertical.offers.join(', ')}`
     });
     
     // Clear cache before firing postback
@@ -273,7 +351,7 @@ export default async function handler(req, res) {
         total_sent: totalSumToSend,
         trigger_param1: triggerParam1,
         action: 'postback_success',
-        message: `Postback successful for offer ${offer_id} (${offerExists.offer_name || 'No name'}) in vertical "${verticalName}". Sum sent: $${totalSumToSend.toFixed(2)}, param1: ${triggerParam1}. Response: ${responseText}`
+        message: `Postback successful for offer ${offer_id} (${offerExists.offer_name || 'No name'}) in vertical "${verticalName}". Sum sent: $${totalSumToSend.toFixed(2)}, sub1: ${triggerParam1}. Response: ${responseText}`
       });
       
     } catch (error) {
