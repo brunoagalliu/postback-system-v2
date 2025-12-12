@@ -391,7 +391,7 @@ export default function OffersManagement() {
                                             <div>
                                                 <div><strong>Trigger:</strong> ${parseFloat(offer.trigger_amount || 0).toFixed(2)}</div>
                                                 <div><strong>Low:</strong> {offer.low_event_type || 'N/A'}</div>
-                                                <div><strong>High:</strong> {offer.high_event_type || 'Purchase'}</div>
+                                                <div><strong>High:</strong> {offer.high_event_type || 'N/A'}</div>
                                             </div>
                                         ) : (
                                             <span style={{ color: '#666', fontStyle: 'italic' }}>Cache & Threshold</span>
@@ -645,7 +645,7 @@ export default function OffersManagement() {
                                         <input
                                             type="text"
                                             name="high_event_type"
-                                            defaultValue={editingOffer?.high_event_type || 'Purchase'}
+                                            defaultValue={editingOffer?.high_event_type || ''}
                                             placeholder="Purchase"
                                             style={{
                                                 width: '100%',
@@ -655,7 +655,7 @@ export default function OffersManagement() {
                                                 boxSizing: 'border-box'
                                             }}
                                         />
-                                        <small style={{ color: '#666' }}>Event fired when param1 ≥ trigger amount (default: Purchase)</small>
+                                        <small style={{ color: '#666' }}>Event fired when param1 ≥ trigger amount (default: )</small>
                                     </div>
                                 </div>
                             )}
@@ -890,7 +890,7 @@ export default function OffersManagement() {
                     <ul style={{ marginLeft: '20px', color: '#666', fontSize: '14px' }}>
                         <li>Fires postback for EVERY conversion immediately</li>
                         <li>Low conversions: sent with custom event (e.g., CompleteRegistration)</li>
-                        <li>High conversions: sent with high event (e.g., Purchase)</li>
+                        <li>High conversions: sent with high event</li>
                         <li>Best for: Pixel tracking, event-based optimization</li>
                     </ul>
                 </div>

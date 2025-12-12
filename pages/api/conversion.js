@@ -178,7 +178,7 @@ export default async function handler(req, res) {
       if (isLowConversion) {
         eventType = offerExists.low_event_type || 'CompleteRegistration';
       } else {
-        eventType = offerExists.high_event_type || 'Purchase';
+        eventType = '';
       }
       
       // Build postback URL with event type
