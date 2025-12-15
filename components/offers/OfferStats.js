@@ -1,5 +1,10 @@
 // File: components/offers/OfferStats.js
 export default function OfferStats({ offers }) {
+    // Safely calculate total cached amount
+    const totalCached = offers && offers.length > 0 
+        ? offers.reduce((sum, o) => sum + (parseFloat(o.total_cached_amount) || 0), 0)
+        : 0;
+
     return (
         <div style={{ 
             display: 'grid', 
@@ -15,7 +20,7 @@ export default function OfferStats({ offers }) {
             }}>
                 <h3 style={{ margin: '0 0 10px 0' }}>Total Offers</h3>
                 <p style={{ margin: 0, fontSize: '24px', fontWeight: 'bold', color: '#0070f3' }}>
-                    {offers.length}
+                    {offers ? offers.length : 0}
                 </p>
             </div>
             <div style={{ 
@@ -26,7 +31,7 @@ export default function OfferStats({ offers }) {
             }}>
                 <h3 style={{ margin: '0 0 10px 0' }}>Simple Mode</h3>
                 <p style={{ margin: 0, fontSize: '24px', fontWeight: 'bold', color: '#28a745' }}>
-                    {offers.filter(o => !o.mode || o.mode === 'simple').length}
+                    {offers ? offers.filter(o => !o.mode || o.mode === 'simple').length : 0}
                 </p>
             </div>
             <div style={{ 
@@ -37,7 +42,7 @@ export default function OfferStats({ offers }) {
             }}>
                 <h3 style={{ margin: '0 0 10px 0' }}>Advanced Mode</h3>
                 <p style={{ margin: 0, fontSize: '24px', fontWeight: 'bold', color: '#6f42c1' }}>
-                    {offers.filter(o => o.mode === 'advanced').length}
+                    {offers ? offers.filter(o => o.mode === 'advanced').length : 0}
                 </p>
             </div>
             <div style={{ 
@@ -48,7 +53,7 @@ export default function OfferStats({ offers }) {
             }}>
                 <h3 style={{ margin: '0 0 10px 0' }}>Total Cached</h3>
                 <p style={{ margin: 0, fontSize: '24px', fontWeight: 'bold', color: '#17a2b8' }}>
-                    ${offers.reduce((sum, o) => sum + (o.total_cached_amount || 0), 0).toFixed(2)}
+                    ${totalCached.toFixed(2)}
                 </p>
             </div>
         </div>
