@@ -42,7 +42,17 @@ export default function DashboardHeader({ loading, onRefresh, onLogout }) {
                     borderRadius: '4px',
                     display: 'inline-block'
                 }}>
-                    Manage Offers
+                    📦 Manage Offers
+                </a>
+                <a href="/verticals" style={{ 
+                    padding: '8px 16px',
+                    background: '#17a2b8',
+                    color: 'white',
+                    textDecoration: 'none',
+                    borderRadius: '4px',
+                    display: 'inline-block'
+                }}>
+                    🎯 Manage Verticals
                 </a>
                 <a href="/logs" style={{ 
                     padding: '8px 16px',
@@ -52,7 +62,7 @@ export default function DashboardHeader({ loading, onRefresh, onLogout }) {
                     borderRadius: '4px',
                     display: 'inline-block'
                 }}>
-                    View Logs
+                    📋 View Logs
                 </a>
             </div>
         </header>
