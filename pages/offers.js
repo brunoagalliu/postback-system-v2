@@ -2,12 +2,12 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
-import OfferStats from '../components/offers/OfferStats';
-import OfferTable from '../components/offers/OfferTable';
-import OfferModal from '../components/offers/OfferModal';
-import AssignVerticalModal from '../components/offers/AssignVerticalModal';
-import DeleteConfirmModal from '../components/offers/DeleteConfirmModal';
-import OfferModeExplainer from '../components/offers/OfferModeExplainer';
+import OfferStats from '@/components/offers/OfferStats';
+import OfferTable from '@/components/offers/OfferTable';
+import OfferModal from '@/components/offers/OfferModal';
+import AssignVerticalModal from '@/components/offers/AssignVerticalModal';
+import DeleteConfirmModal from '@/components/offers/DeleteConfirmModal';
+import OfferModeExplainer from '@/components/offers/OfferModeExplainer';
 
 export default function OffersManagement() {
     const router = useRouter();
