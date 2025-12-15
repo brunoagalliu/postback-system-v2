@@ -294,56 +294,56 @@ export default function VerticalsManagement() {
                                         {vertical.offer_count || 0}
                                     </td>
                                     <td style={{ padding: '12px', border: '1px solid #dee2e6', textAlign: 'center' }}>
-                                        <div style={{ display: 'flex', gap: '5px', justifyContent: 'center' }}>
-                                            <button 
-                                                onClick={() => {
-                                                    setEditingVertical(vertical);
-                                                    setShowVerticalModal(true);
-                                                }}
-                                                style={{
-                                                    padding: '4px 8px',
-                                                    background: '#0070f3',
-                                                    color: 'white',
-                                                    border: 'none',
-                                                    borderRadius: '3px',
-                                                    cursor: 'pointer',
-                                                    fontSize: '12px'
-                                                }}
-                                            >
-                                                Edit
-                                            </button>
-                                            <a 
-                                                href={`/vertical/${vertical.id}`}
-                                                style={{
-                                                    padding: '4px 8px',
-                                                    background: '#17a2b8',
-                                                    color: 'white',
-                                                    border: 'none',
-                                                    borderRadius: '3px',
-                                                    cursor: 'pointer',
-                                                    fontSize: '12px',
-                                                    textDecoration: 'none',
-                                                    display: 'inline-block'
-                                                }}
-                                            >
-                                                View
-                                            </button>
-                                            <button 
-                                                onClick={() => setShowDeleteConfirm(vertical.id)}
-                                                style={{
-                                                    padding: '4px 8px',
-                                                    background: '#dc3545',
-                                                    color: 'white',
-                                                    border: 'none',
-                                                    borderRadius: '3px',
-                                                    cursor: 'pointer',
-                                                    fontSize: '12px'
-                                                }}
-                                            >
-                                                Delete
-                                            </button>
-                                        </div>
-                                    </td>
+    <div style={{ display: 'flex', gap: '5px', justifyContent: 'center' }}>
+        <button 
+            onClick={() => {
+                setEditingVertical(vertical);
+                setShowVerticalModal(true);
+            }}
+            style={{
+                padding: '4px 8px',
+                background: '#0070f3',
+                color: 'white',
+                border: 'none',
+                borderRadius: '3px',
+                cursor: 'pointer',
+                fontSize: '12px'
+            }}
+        >
+            Edit
+        </button>
+        <a 
+            href={`/vertical/${vertical.id}`}
+            style={{
+                padding: '4px 8px',
+                background: '#17a2b8',
+                color: 'white',
+                border: 'none',
+                borderRadius: '3px',
+                cursor: 'pointer',
+                fontSize: '12px',
+                textDecoration: 'none',
+                display: 'inline-block'
+            }}
+        >
+            View
+        </a>
+        <button 
+            onClick={() => setShowDeleteConfirm(vertical.id)}
+            style={{
+                padding: '4px 8px',
+                background: '#dc3545',
+                color: 'white',
+                border: 'none',
+                borderRadius: '3px',
+                cursor: 'pointer',
+                fontSize: '12px'
+            }}
+        >
+            Delete
+        </button>
+    </div>
+</td>
                                 </tr>
                             ))}
                         </tbody>
