@@ -2,6 +2,12 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
+import OfferStats from '../components/offers/OfferStats';
+import OfferTable from '../components/offers/OfferTable';
+import OfferModal from '../components/offers/OfferModal';
+import AssignVerticalModal from '../components/offers/AssignVerticalModal';
+import DeleteConfirmModal from '../components/offers/DeleteConfirmModal';
+import OfferModeExplainer from '../components/offers/OfferModeExplainer';
 
 export default function OffersManagement() {
     const router = useRouter();
@@ -15,7 +21,6 @@ export default function OffersManagement() {
     const [editingOffer, setEditingOffer] = useState(null);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(null);
     const [showAssignModal, setShowAssignModal] = useState(null);
-    const [selectedMode, setSelectedMode] = useState('simple');
 
     // Check authentication on mount
     useEffect(() => {
@@ -44,7 +49,6 @@ export default function OffersManagement() {
             }
         });
 
-        // If unauthorized, redirect to login
         if (response.status === 401) {
             localStorage.removeItem('admin_token');
             router.push('/admin-login');
@@ -54,7 +58,6 @@ export default function OffersManagement() {
         return response;
     };
 
-    // Logout function
     const handleLogout = () => {
         localStorage.removeItem('admin_token');
         router.push('/admin-login');
@@ -93,7 +96,7 @@ export default function OffersManagement() {
         }
     };
 
-    const handleCreateOffer = async (e) => {
+    const handleOfferSubmit = async (e) => {
         e.preventDefault();
         const formData = new FormData(e.target);
 
@@ -108,61 +111,39 @@ export default function OffersManagement() {
 
         try {
             const response = await authFetch('/api/admin/simple-offers', {
-                method: 'POST',
-                body: JSON.stringify(offerData)
+                method: editingOffer ? 'PUT' : 'POST',
+                body: JSON.stringify(editingOffer ? {...offerData, offer_id: editingOffer.offer_id} : offerData)
             });
 
             const result = await response.json();
             if (result.success) {
                 alert(result.message);
                 setShowOfferModal(false);
-                setSelectedMode('simple');
+                setEditingOffer(null);
                 fetchOffers();
                 
-                // Auto-assign to vertical if selected
-                const verticalId = formData.get('vertical_id');
-                if (verticalId && verticalId !== '') {
-                    await assignOfferToVertical(offerData.offer_id, verticalId);
+                // Auto-assign to vertical if creating new simple mode offer
+                if (!editingOffer && offerData.mode === 'simple') {
+                    const verticalId = formData.get('vertical_id');
+                    if (verticalId && verticalId !== '') {
+                        await assignOfferToVertical(offerData.offer_id, verticalId);
+                    }
                 }
             } else {
                 alert('Error: ' + result.message);
             }
         } catch (err) {
-            alert('Error creating offer: ' + err.message);
+            alert('Error: ' + err.message);
         }
     };
 
-    const handleUpdateOffer = async (e) => {
+    const handleAssignSubmit = async (e) => {
         e.preventDefault();
         const formData = new FormData(e.target);
-
-        const offerData = {
-            offer_id: editingOffer.offer_id,
-            offer_name: formData.get('offer_name'),
-            mode: formData.get('mode'),
-            trigger_amount: formData.get('trigger_amount'),
-            low_event_type: formData.get('low_event_type'),
-            high_event_type: formData.get('high_event_type')
-        };
-
-        try {
-            const response = await authFetch('/api/admin/simple-offers', {
-                method: 'PUT',
-                body: JSON.stringify(offerData)
-            });
-
-            const result = await response.json();
-            if (result.success) {
-                alert(result.message);
-                setEditingOffer(null);
-                setShowOfferModal(false);
-                setSelectedMode('simple');
-                fetchOffers();
-            } else {
-                alert('Error: ' + result.message);
-            }
-        } catch (err) {
-            alert('Error updating offer: ' + err.message);
+        const verticalId = formData.get('vertical_id');
+        
+        if (verticalId && showAssignModal) {
+            await assignOfferToVertical(showAssignModal, verticalId);
         }
     };
 
@@ -186,9 +167,11 @@ export default function OffersManagement() {
         }
     };
 
-    const handleDeleteOffer = async (offerId) => {
+    const handleDeleteOffer = async () => {
+        if (!showDeleteConfirm) return;
+
         try {
-            const response = await authFetch(`/api/admin/simple-offers?offer_id=${offerId}`, {
+            const response = await authFetch(`/api/admin/simple-offers?offer_id=${showDeleteConfirm}`, {
                 method: 'DELETE'
             });
 
@@ -253,7 +236,6 @@ export default function OffersManagement() {
                     <button 
                         onClick={() => {
                             setEditingOffer(null);
-                            setSelectedMode('simple');
                             setShowOfferModal(true);
                         }}
                         style={{
@@ -292,609 +274,46 @@ export default function OffersManagement() {
                 </div>
             )}
 
-            {/* Summary Stats */}
-            <div style={{ 
-                display: 'grid', 
-                gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', 
-                gap: '20px',
-                marginBottom: '30px'
-            }}>
-                <div style={{ 
-                    padding: '20px', 
-                    background: '#f8f9fa', 
-                    borderRadius: '8px',
-                    border: '1px solid #e9ecef'
-                }}>
-                    <h3 style={{ margin: '0 0 10px 0' }}>Total Offers</h3>
-                    <p style={{ margin: 0, fontSize: '24px', fontWeight: 'bold', color: '#0070f3' }}>
-                        {offers.length}
-                    </p>
-                </div>
-                <div style={{ 
-                    padding: '20px', 
-                    background: '#f8f9fa', 
-                    borderRadius: '8px',
-                    border: '1px solid #e9ecef'
-                }}>
-                    <h3 style={{ margin: '0 0 10px 0' }}>Simple Mode</h3>
-                    <p style={{ margin: 0, fontSize: '24px', fontWeight: 'bold', color: '#28a745' }}>
-                        {offers.filter(o => !o.mode || o.mode === 'simple').length}
-                    </p>
-                </div>
-                <div style={{ 
-                    padding: '20px', 
-                    background: '#f8f9fa', 
-                    borderRadius: '8px',
-                    border: '1px solid #e9ecef'
-                }}>
-                    <h3 style={{ margin: '0 0 10px 0' }}>Advanced Mode</h3>
-                    <p style={{ margin: 0, fontSize: '24px', fontWeight: 'bold', color: '#6f42c1' }}>
-                        {offers.filter(o => o.mode === 'advanced').length}
-                    </p>
-                </div>
-                <div style={{ 
-                    padding: '20px', 
-                    background: '#f8f9fa', 
-                    borderRadius: '8px',
-                    border: '1px solid #e9ecef'
-                }}>
-                    <h3 style={{ margin: '0 0 10px 0' }}>Total Cached</h3>
-                    <p style={{ margin: 0, fontSize: '24px', fontWeight: 'bold', color: '#17a2b8' }}>
-                        ${offers.reduce((sum, o) => sum + (o.total_cached_amount || 0), 0).toFixed(2)}
-                    </p>
-                </div>
-            </div>
+            <OfferStats offers={offers} />
 
-            {/* Offers Table */}
-            {offers.length > 0 && (
-                <div style={{ overflowX: 'auto' }}>
-                    <table style={{ 
-                        width: '100%', 
-                        borderCollapse: 'collapse',
-                        background: 'white'
-                    }}>
-                        <thead>
-                            <tr style={{ background: '#f8f9fa' }}>
-                                <th style={{ padding: '12px', border: '1px solid #dee2e6', textAlign: 'left' }}>Offer ID</th>
-                                <th style={{ padding: '12px', border: '1px solid #dee2e6', textAlign: 'left' }}>Offer Name</th>
-                                <th style={{ padding: '12px', border: '1px solid #dee2e6', textAlign: 'center' }}>Mode</th>
-                                <th style={{ padding: '12px', border: '1px solid #dee2e6', textAlign: 'left' }}>Config</th>
-                                <th style={{ padding: '12px', border: '1px solid #dee2e6', textAlign: 'left' }}>Assigned Vertical</th>
-                                <th style={{ padding: '12px', border: '1px solid #dee2e6', textAlign: 'right' }}>Conversions</th>
-                                <th style={{ padding: '12px', border: '1px solid #dee2e6', textAlign: 'right' }}>Cached</th>
-                                <th style={{ padding: '12px', border: '1px solid #dee2e6', textAlign: 'center' }}>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {offers.map((offer, index) => (
-                                <tr key={index}>
-                                    <td style={{ padding: '12px', border: '1px solid #dee2e6', fontWeight: 'bold' }}>
-                                        {offer.offer_id}
-                                    </td>
-                                    <td style={{ padding: '12px', border: '1px solid #dee2e6' }}>
-                                        {offer.offer_name || <span style={{ color: '#666', fontStyle: 'italic' }}>No name</span>}
-                                    </td>
-                                    <td style={{ padding: '12px', border: '1px solid #dee2e6', textAlign: 'center' }}>
-                                        <span style={{
-                                            padding: '4px 8px',
-                                            borderRadius: '4px',
-                                            fontSize: '12px',
-                                            fontWeight: 'bold',
-                                            background: offer.mode === 'advanced' ? '#e7d4f5' : '#d4edda',
-                                            color: offer.mode === 'advanced' ? '#6f42c1' : '#28a745'
-                                        }}>
-                                            {offer.mode === 'advanced' ? '⚡ Advanced' : '📦 Simple'}
-                                        </span>
-                                    </td>
-                                    <td style={{ padding: '12px', border: '1px solid #dee2e6', fontSize: '12px' }}>
-                                        {offer.mode === 'advanced' ? (
-                                            <div>
-                                                <div><strong>Trigger:</strong> ${parseFloat(offer.trigger_amount || 0).toFixed(2)}</div>
-                                                <div><strong>Low:</strong> {offer.low_event_type || 'N/A'}</div>
-                                                <div><strong>High:</strong> {offer.high_event_type || 'Purchase'}</div>
-                                            </div>
-                                        ) : (
-                                            <span style={{ color: '#666', fontStyle: 'italic' }}>Cache & Threshold</span>
-                                        )}
-                                    </td>
-                                    <td style={{ padding: '12px', border: '1px solid #dee2e6' }}>
-                                        {offer.vertical_name ? (
-                                            <div>
-                                                <strong>{offer.vertical_name}</strong>
-                                                <div style={{ fontSize: '12px', color: '#666' }}>
-                                                    ${parseFloat(offer.payout_threshold || 10).toFixed(2)} threshold
-                                                </div>
-                                            </div>
-                                        ) : (
-                                            <span style={{ color: '#dc3545', fontStyle: 'italic' }}>Unassigned</span>
-                                        )}
-                                    </td>
-                                    <td style={{ padding: '12px', border: '1px solid #dee2e6', textAlign: 'right' }}>
-                                        {offer.total_conversions || 0}
-                                    </td>
-                                    <td style={{ padding: '12px', border: '1px solid #dee2e6', textAlign: 'right' }}>
-                                        {offer.mode === 'advanced' ? (
-                                            <span style={{ color: '#666', fontStyle: 'italic' }}>N/A</span>
-                                        ) : (
-                                            `$${parseFloat(offer.total_cached_amount || 0).toFixed(2)}`
-                                        )}
-                                    </td>
-                                    <td style={{ padding: '12px', border: '1px solid #dee2e6', textAlign: 'center' }}>
-                                        <div style={{ display: 'flex', gap: '5px', justifyContent: 'center' }}>
-                                            <button 
-                                                onClick={() => {
-                                                    setEditingOffer(offer);
-                                                    setSelectedMode(offer.mode || 'simple');
-                                                    setShowOfferModal(true);
-                                                }}
-                                                style={{
-                                                    padding: '4px 8px',
-                                                    background: '#0070f3',
-                                                    color: 'white',
-                                                    border: 'none',
-                                                    borderRadius: '3px',
-                                                    cursor: 'pointer',
-                                                    fontSize: '12px'
-                                                }}
-                                            >
-                                                Edit
-                                            </button>
-                                            {offer.mode !== 'advanced' && (
-                                                <button 
-                                                    onClick={() => setShowAssignModal(offer.offer_id)}
-                                                    style={{
-                                                        padding: '4px 8px',
-                                                        background: '#28a745',
-                                                        color: 'white',
-                                                        border: 'none',
-                                                        borderRadius: '3px',
-                                                        cursor: 'pointer',
-                                                        fontSize: '12px'
-                                                    }}
-                                                >
-                                                    Assign
-                                                </button>
-                                            )}
-                                            <button 
-                                                onClick={() => setShowDeleteConfirm(offer.offer_id)}
-                                                style={{
-                                                    padding: '4px 8px',
-                                                    background: '#dc3545',
-                                                    color: 'white',
-                                                    border: 'none',
-                                                    borderRadius: '3px',
-                                                    cursor: 'pointer',
-                                                    fontSize: '12px'
-                                                }}
-                                            >
-                                                Delete
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-            )}
+            <OfferTable 
+                offers={offers}
+                loading={loading}
+                onEdit={(offer) => {
+                    setEditingOffer(offer);
+                    setShowOfferModal(true);
+                }}
+                onAssign={(offerId) => setShowAssignModal(offerId)}
+                onDelete={(offerId) => setShowDeleteConfirm(offerId)}
+            />
 
-            {offers.length === 0 && !loading && (
-                <div style={{ 
-                    textAlign: 'center', 
-                    padding: '40px', 
-                    background: '#f8f9fa', 
-                    borderRadius: '8px' 
-                }}>
-                    <h3>No offers found</h3>
-                    <p>Create your first offer to get started with conversion tracking.</p>
-                </div>
-            )}
+            <OfferModal
+                show={showOfferModal}
+                editingOffer={editingOffer}
+                verticals={verticals}
+                onSubmit={handleOfferSubmit}
+                onClose={() => {
+                    setShowOfferModal(false);
+                    setEditingOffer(null);
+                }}
+            />
 
-            {/* Offer Modal */}
-            {showOfferModal && (
-                <div style={{
-                    position: 'fixed',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    backgroundColor: 'rgba(0,0,0,0.5)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    zIndex: 1000,
-                    overflowY: 'auto'
-                }}>
-                    <div style={{
-                        backgroundColor: 'white',
-                        padding: '30px',
-                        borderRadius: '8px',
-                        width: '600px',
-                        maxWidth: '90vw',
-                        maxHeight: '90vh',
-                        overflowY: 'auto',
-                        margin: '20px'
-                    }}>
-                        <h3>{editingOffer ? 'Edit Offer' : 'Create New Offer'}</h3>
-                        <form onSubmit={editingOffer ? handleUpdateOffer : handleCreateOffer}>
-                            <div style={{ marginBottom: '15px' }}>
-                                <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-                                    Offer ID: *
-                                </label>
-                                <input
-                                    type="text"
-                                    name="offer_id"
-                                    defaultValue={editingOffer?.offer_id || ''}
-                                    disabled={!!editingOffer}
-                                    required
-                                    style={{
-                                        width: '100%',
-                                        padding: '8px',
-                                        border: '1px solid #ccc',
-                                        borderRadius: '4px',
-                                        backgroundColor: editingOffer ? '#f8f9fa' : 'white',
-                                        boxSizing: 'border-box'
-                                    }}
-                                />
-                            </div>
+            <AssignVerticalModal
+                show={!!showAssignModal}
+                offerId={showAssignModal}
+                verticals={verticals}
+                onSubmit={handleAssignSubmit}
+                onClose={() => setShowAssignModal(null)}
+            />
 
-                            <div style={{ marginBottom: '15px' }}>
-                                <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-                                    Offer Name: (optional)
-                                </label>
-                                <input
-                                    type="text"
-                                    name="offer_name"
-                                    defaultValue={editingOffer?.offer_name || ''}
-                                    placeholder="e.g., Weight Loss Campaign A"
-                                    style={{
-                                        width: '100%',
-                                        padding: '8px',
-                                        border: '1px solid #ccc',
-                                        borderRadius: '4px',
-                                        boxSizing: 'border-box'
-                                    }}
-                                />
-                            </div>
+            <DeleteConfirmModal
+                show={!!showDeleteConfirm}
+                offerId={showDeleteConfirm}
+                onConfirm={handleDeleteOffer}
+                onClose={() => setShowDeleteConfirm(null)}
+            />
 
-                            <div style={{ marginBottom: '15px' }}>
-                                <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-                                    Mode: *
-                                </label>
-                                <select
-                                    name="mode"
-                                    value={editingOffer ? (editingOffer.mode || 'simple') : selectedMode}
-                                    onChange={(e) => setSelectedMode(e.target.value)}
-                                    required
-                                    style={{
-                                        width: '100%',
-                                        padding: '8px',
-                                        border: '1px solid #ccc',
-                                        borderRadius: '4px',
-                                        boxSizing: 'border-box'
-                                    }}
-                                >
-                                    <option value="simple">📦 Simple Mode (Cache & Threshold)</option>
-                                    <option value="advanced">⚡ Advanced Mode (Instant Fire with Events)</option>
-                                </select>
-                                <small style={{ color: '#666', display: 'block', marginTop: '5px' }}>
-                                    {(editingOffer ? (editingOffer.mode || 'simple') : selectedMode) === 'simple' ? 
-                                        'Caches conversions below threshold, fires when reached' : 
-                                        'Fires every conversion instantly with custom event types'}
-                                </small>
-                            </div>
-
-                            {/* Advanced Mode Fields */}
-                            {((editingOffer && (editingOffer.mode === 'advanced')) || (!editingOffer && selectedMode === 'advanced')) && (
-                                <div style={{ 
-                                    padding: '15px', 
-                                    background: '#f8f9fa', 
-                                    borderRadius: '8px',
-                                    marginBottom: '15px'
-                                }}>
-                                    <h4 style={{ margin: '0 0 15px 0', color: '#6f42c1' }}>⚡ Advanced Mode Settings</h4>
-                                    
-                                    <div style={{ marginBottom: '15px' }}>
-                                        <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-                                            Trigger Amount ($): *
-                                        </label>
-                                        <input
-                                            type="number"
-                                            name="trigger_amount"
-                                            step="0.01"
-                                            min="0.01"
-                                            defaultValue={editingOffer?.trigger_amount || 50}
-                                            required={(editingOffer ? (editingOffer.mode === 'advanced') : (selectedMode === 'advanced'))}
-                                            placeholder="50.00"
-                                            style={{
-                                                width: '100%',
-                                                padding: '8px',
-                                                border: '1px solid #ccc',
-                                                borderRadius: '4px',
-                                                boxSizing: 'border-box'
-                                            }}
-                                        />
-                                        <small style={{ color: '#666' }}>Conversions below this will use low event type</small>
-                                    </div>
-
-                                    <div style={{ marginBottom: '15px' }}>
-                                        <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-                                            Low Event Type: *
-                                        </label>
-                                        <input
-                                            type="text"
-                                            name="low_event_type"
-                                            defaultValue={editingOffer?.low_event_type || 'CompleteRegistration'}
-                                            required={(editingOffer ? (editingOffer.mode === 'advanced') : (selectedMode === 'advanced'))}
-                                            placeholder="CompleteRegistration"
-                                            style={{
-                                                width: '100%',
-                                                padding: '8px',
-                                                border: '1px solid #ccc',
-                                                borderRadius: '4px',
-                                                boxSizing: 'border-box'
-                                            }}
-                                        />
-                                        <small style={{ color: '#666' }}>Event fired when param1 &lt; trigger amount</small>
-                                    </div>
-
-                                    <div style={{ marginBottom: '0' }}>
-                                        <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-                                            High Event Type: (optional)
-                                        </label>
-                                        <input
-                                            type="text"
-                                            name="high_event_type"
-                                            defaultValue={editingOffer?.high_event_type || 'Purchase'}
-                                            placeholder="Purchase"
-                                            style={{
-                                                width: '100%',
-                                                padding: '8px',
-                                                border: '1px solid #ccc',
-                                                borderRadius: '4px',
-                                                boxSizing: 'border-box'
-                                            }}
-                                        />
-                                        <small style={{ color: '#666' }}>Event fired when param1 ≥ trigger amount (default: Purchase)</small>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Simple Mode: Show vertical assignment */}
-                            {!editingOffer && ((editingOffer ? (editingOffer.mode || 'simple') : selectedMode) === 'simple') && (
-                                <div style={{ marginBottom: '20px' }}>
-                                    <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-                                        Assign to Vertical: (optional)
-                                    </label>
-                                    <select
-                                        name="vertical_id"
-                                        style={{
-                                            width: '100%',
-                                            padding: '8px',
-                                            border: '1px solid #ccc',
-                                            borderRadius: '4px',
-                                            boxSizing: 'border-box'
-                                        }}
-                                    >
-                                        <option value="">Select a vertical...</option>
-                                        {verticals.map(vertical => (
-                                            <option key={vertical.id} value={vertical.id}>
-                                                {vertical.name} (${vertical.payout_threshold})
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-                            )}
-
-                            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '20px' }}>
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setShowOfferModal(false);
-                                        setEditingOffer(null);
-                                        setSelectedMode('simple');
-                                    }}
-                                    style={{
-                                        padding: '8px 16px',
-                                        background: '#6c757d',
-                                        color: 'white',
-                                        border: 'none',
-                                        borderRadius: '4px',
-                                        cursor: 'pointer'
-                                    }}
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    type="submit"
-                                    style={{
-                                        padding: '8px 16px',
-                                        background: '#28a745',
-                                        color: 'white',
-                                        border: 'none',
-                                        borderRadius: '4px',
-                                        cursor: 'pointer'
-                                    }}
-                                >
-                                    {editingOffer ? 'Update Offer' : 'Create Offer'}
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
-
-            {/* Assign Vertical Modal */}
-            {showAssignModal && (
-                <div style={{
-                    position: 'fixed',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    backgroundColor: 'rgba(0,0,0,0.5)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    zIndex: 1000
-                }}>
-                    <div style={{
-                        backgroundColor: 'white',
-                        padding: '30px',
-                        borderRadius: '8px',
-                        width: '400px',
-                        maxWidth: '90vw'
-                    }}>
-                        <h3>Assign Offer to Vertical</h3>
-                        <p>Assigning offer: <strong>{showAssignModal}</strong></p>
-                        <form onSubmit={(e) => {
-                            e.preventDefault();
-                            const formData = new FormData(e.target);
-                            const verticalId = formData.get('vertical_id');
-                            if (verticalId) {
-                                assignOfferToVertical(showAssignModal, verticalId);
-                            }
-                            }}>
-                            <div style={{ marginBottom: '20px' }}>
-                            <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-                            Select Vertical:
-                            </label>
-                            <select
-                            name="vertical_id"
-                            required
-                            style={{
-                            width: '100%',
-                            padding: '8px',
-                            border: '1px solid #ccc',
-                            borderRadius: '4px',
-                            boxSizing: 'border-box'
-                            }}
-                            >
-                            <option value="">Select a vertical...</option>
-                            {verticals.map(vertical => (
-                            <option key={vertical.id} value={vertical.id}>
-                            {vertical.name} (${vertical.payout_threshold})
-                            </option>
-                            ))}
-                            </select>
-                            </div>
-                            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-                            <button
-                                type="button"
-                                onClick={() => setShowAssignModal(null)}
-                                style={{
-                                    padding: '8px 16px',
-                                    background: '#6c757d',
-                                    color: 'white',
-                                    border: 'none',
-                                    borderRadius: '4px',
-                                    cursor: 'pointer'
-                                }}
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                type="submit"
-                                style={{
-                                    padding: '8px 16px',
-                                    background: '#28a745',
-                                    color: 'white',
-                                    border: 'none',
-                                    borderRadius: '4px',
-                                    cursor: 'pointer'
-                                }}
-                            >
-                                Assign
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        )}
-
-        {/* Delete Confirmation Modal */}
-        {showDeleteConfirm && (
-            <div style={{
-                position: 'fixed',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                backgroundColor: 'rgba(0,0,0,0.5)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                zIndex: 1000
-            }}>
-                <div style={{
-                    backgroundColor: 'white',
-                    padding: '30px',
-                    borderRadius: '8px',
-                    width: '400px',
-                    maxWidth: '90vw'
-                }}>
-                    <h3>Confirm Delete</h3>
-                    <p>Are you sure you want to delete offer <strong>{showDeleteConfirm}</strong>?</p>
-                    <p style={{ color: '#dc3545', fontSize: '14px' }}>
-                        This will also remove all cached conversions and vertical assignments for this offer.
-                    </p>
-                    
-                    <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-                        <button
-                            type="button"
-                            onClick={() => setShowDeleteConfirm(null)}
-                            style={{
-                                padding: '8px 16px',
-                                background: '#6c757d',
-                                color: 'white',
-                                border: 'none',
-                                borderRadius: '4px',
-                                cursor: 'pointer'
-                            }}
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => handleDeleteOffer(showDeleteConfirm)}
-                            style={{
-                                padding: '8px 16px',
-                                background: '#dc3545',
-                                color: 'white',
-                                border: 'none',
-                                borderRadius: '4px',
-                                cursor: 'pointer'
-                            }}
-                        >
-                            Delete Offer
-                        </button>
-                    </div>
-                </div>
-            </div>
-        )}
-
-        <footer style={{ marginTop: '30px', padding: '20px', background: '#f8f9fa', borderRadius: '8px' }}>
-            <h4>Offer Modes Explained:</h4>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px', marginTop: '15px' }}>
-                <div>
-                    <h5 style={{ margin: '0 0 10px 0', color: '#28a745' }}>📦 Simple Mode</h5>
-                    <ul style={{ marginLeft: '20px', color: '#666', fontSize: '14px' }}>
-                        <li>Caches conversions below threshold</li>
-                        <li>Fires ONE postback when threshold reached</li>
-                        <li>Sends accumulated sum amount</li>
-                        <li>Best for: Cost optimization, reducing postback frequency</li>
-                    </ul>
-                </div>
-                <div>
-                    <h5 style={{ margin: '0 0 10px 0', color: '#6f42c1' }}>⚡ Advanced Mode</h5>
-                    <ul style={{ marginLeft: '20px', color: '#666', fontSize: '14px' }}>
-                        <li>Fires postback for EVERY conversion immediately</li>
-                        <li>Low conversions: sent with custom event (e.g., CompleteRegistration)</li>
-                        <li>High conversions: sent with high event (e.g., Purchase)</li>
-                        <li>Best for: Pixel tracking, event-based optimization</li>
-                    </ul>
-                </div>
-            </div>
-        </footer>
-    </div>
-);}                            
+            <OfferModeExplainer />
+        </div>
+    );
+}
